@@ -7,6 +7,7 @@ const helmet = require('helmet');
 
 const authRoutes = require('./routes/auth.routes');
 const productRoutes = require('./routes/product.routes');
+const saleRoutes = require('./routes/sale.routes');
 
 
 const app = express();
@@ -34,6 +35,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/productos', productRoutes);
+app.use('/api/ventas', saleRoutes);
 
 
 const PORT = process.env.PORT || 4000;

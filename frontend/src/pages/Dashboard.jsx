@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { productService } from '../services/productService';
+import { salesService } from '../services/salesService';
 import ProductTable from '../components/ProductTable';
 import ProductForm from '../components/ProductForm';
+import SalesTable from '../components/SalesTable';
+import SaleForm from '../components/SaleForm';
 import WelcomeBanner from '../components/WelcomeBanner';
 import { Plus, LogOut, Package, Search } from 'lucide-react';
 
@@ -16,6 +19,14 @@ const Dashboard = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Sales state
+  const [sales, setSales] = useState([]);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const [salesDate, setSalesDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showSaleForm, setShowSaleForm] = useState(false);
+  const [salesTotals, setSalesTotals] = useState({});
+  const [notice, setNotice] = useState(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate('/login');
@@ -25,6 +36,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadProducts();
+      loadSales(salesDate);
     }
   }, [isAuthenticated]);
 
@@ -50,6 +62,57 @@ const Dashboard = () => {
 
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
+
+  // Sales functions
+  const loadSales = async (date) => {
+    try {
+      setSalesLoading(true);
+      const response = await salesService.getAll({ date });
+      setSales(response.data);
+      const totalsRes = await salesService.totals(date);
+      setSalesTotals(totalsRes.data || {});
+    } catch (error) {
+      console.error('Error cargando ventas:', error);
+    } finally {
+      setSalesLoading(false);
+    }
+  };
+
+  const handleDateChange = (d) => {
+    setSalesDate(d);
+    loadSales(d);
+  };
+
+  const handleOpenSaleForm = () => setShowSaleForm(true);
+
+  const handleCreateSale = async (data) => {
+    try {
+      const res = await salesService.create(data);
+      const created = res.data;
+      setShowSaleForm(false);
+
+      // show success notice
+      setNotice({ type: 'success', message: 'Venta registrada correctamente' });
+      setTimeout(() => setNotice(null), 3000);
+
+      // Determine date part of the soldAt and load that day's sales so the new sale appears
+      if (created && created.soldAt) {
+        const d = new Date(created.soldAt);
+        const dateStr = d.toISOString().split('T')[0];
+        setSalesDate(dateStr);
+        await loadSales(dateStr);
+      } else {
+        // fallback: reload current filter
+        await loadSales(salesDate);
+      }
+
+      loadProducts(); // update stock
+    } catch (error) {
+      console.error('Error registrando venta:', error);
+      alert(error.response?.data?.message || 'Error al registrar la venta');
+    }
+  };
+
 
   const handleCreate = () => {
     setEditingProduct(null);
@@ -154,7 +217,7 @@ const Dashboard = () => {
         </div>
 
         {/* Products Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
           <ProductTable
             products={products}
             onEdit={handleEdit}
@@ -162,6 +225,32 @@ const Dashboard = () => {
             loading={loading}
           />
         </div>
+
+        {/* Sales Section (below products) */}
+        {notice && (
+          <div className={`mb-4 px-4 py-3 rounded border ${notice.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
+            {notice.message}
+          </div>
+        )}
+        <SalesTable
+          sales={sales}
+          loading={salesLoading}
+          date={salesDate}
+          onDateChange={handleDateChange}
+          totals={salesTotals}
+          onOpenForm={handleOpenSaleForm}
+        />
+
+        {/* Inline Sale Form panel (appears below sales) */}
+        {showSaleForm && (
+          <div className="mt-6">
+            <SaleForm
+              products={products}
+              onClose={() => setShowSaleForm(false)}
+              onSubmit={handleCreateSale}
+            />
+          </div>
+        )}
       </main>
 
       {/* Product Form Modal */}
@@ -174,6 +263,15 @@ const Dashboard = () => {
           }}
           onSubmit={handleSubmit}
           loading={false}
+        />
+      )}
+
+      {/* Sale Form Modal */}
+      {showSaleForm && (
+        <SaleForm
+          products={products}
+          onClose={() => setShowSaleForm(false)}
+          onSubmit={handleCreateSale}
         />
       )}
     </div>
