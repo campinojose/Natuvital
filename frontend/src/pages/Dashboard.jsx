@@ -241,16 +241,7 @@ const Dashboard = () => {
           onOpenForm={handleOpenSaleForm}
         />
 
-        {/* Inline Sale Form panel (appears below sales) */}
-        {showSaleForm && (
-          <div className="mt-6">
-            <SaleForm
-              products={products}
-              onClose={() => setShowSaleForm(false)}
-              onSubmit={handleCreateSale}
-            />
-          </div>
-        )}
+
       </main>
 
       {/* Product Form Modal */}
